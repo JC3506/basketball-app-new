@@ -1,3 +1,4 @@
+
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { v4 as uuidv4 } from 'uuid'
@@ -70,6 +71,9 @@ interface BasketballStore {
   getGame: (gameId: string) => Game | undefined;
   getPlayerStats: (gameId: string, playerId: string) => PlayerStats | undefined;
   calculatePlayerEfficiency: (stats: PlayerStats) => number;
+  
+  // Add the generateInsights function to the interface
+  generateInsights: (gameId: string, playerId: string, stats: PlayerStats) => void;
 }
 
 // Initialize empty player stats
@@ -309,7 +313,7 @@ export const useBasketballStore = create<BasketballStore>()(
         return stats.PTS + stats['REB_OFF'] + stats['REB_DEF'] + stats.AST + stats.STL + stats.BLK - stats.TO - (stats['2PT_MISS'] + stats['3PT_MISS'] + stats['FT_MISS'])
       },
       
-      // Helper function to generate insights (not exposed in the interface)
+      // Implementation of the generateInsights function
       generateInsights: (gameId, playerId, stats) => {
         const game = get().getGame(gameId)
         if (!game) return
@@ -340,7 +344,7 @@ export const useBasketballStore = create<BasketballStore>()(
         }
         
         if (stats.FOUL >= 4) {
-          newInsights.push(`⚠️ ${player.name} has ${stats.FOUL} fouls. Consider substitution to avoid fouling out.`)
+          newInsights.push(`\u26a0\ufe0f ${player.name} has ${stats.FOUL} fouls. Consider substitution to avoid fouling out.`)
         }
         
         // Only add new unique insights
