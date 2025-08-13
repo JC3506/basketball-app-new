@@ -12,6 +12,102 @@ export interface Player {
   isActive: boolean;
 }
 
+// store.ts
+
+import { v4 as uuidv4 } from 'uuid';
+
+// 🧩 Type Definitions
+export interface ComparisonCriteria {
+  dateRange: 'all' | 'last5' | 'last10' | 'custom';
+  customDateStart?: string;
+  customDateEnd?: string;
+  gameIds?: string[];
+  lineupIds?: string[];
+}
+
+export interface ComparisonResult {
+  id: string;
+  name: string;
+  criteria: ComparisonCriteria;
+  stats: {
+    PTS: number;
+    REB: number;
+    AST: number;
+    STL: number;
+    BLK: number;
+    TO: number;
+    FGM: number;
+    FGA: number;
+    FG_PCT: number;
+    TPM: number;
+    TPA: number;
+    TP_PCT: number;
+    FTM: number;
+    FTA: number;
+    FT_PCT: number;
+  };
+  timestamp: string;
+}
+
+// 🏀 Extend BasketballStore Interface
+interface BasketballStore {
+  // ...existing properties
+
+  savedComparisons: ComparisonResult[];
+  createComparison: (name: string, criteria: ComparisonCriteria) => string;
+  deleteComparison: (id: string) => void;
+  getComparisonData: (criteria: ComparisonCriteria) => ComparisonResult;
+}
+
+// ⚙️ Store Implementation
+const useBasketballStore = create<BasketballStore>((set, get) => ({
+  // ...existing state and methods
+
+  savedComparisons: [],
+
+  createComparison: (name, criteria) => {
+    const id = uuidv4();
+    const comparisonData = get().getComparisonData(criteria);
+
+    const newComparison: ComparisonResult = {
+      id,
+      name,
+      criteria,
+      stats: comparisonData.stats,
+      timestamp: new Date().toISOString(),
+    };
+
+    set(state => ({
+      savedComparisons: [...state.savedComparisons, newComparison],
+    }));
+
+    return id;
+  },
+
+  deleteComparison: (id) => {
+    set(state => ({
+      savedComparisons: state.savedComparisons.filter(comp => comp.id !== id),
+    }));
+  },
+
+  getComparisonData: (criteria) => {
+    // TODO: Implement logic from team-comparison-feature.md
+    // Placeholder return for now
+    return {
+      id: 'temp',
+      name: 'Temporary',
+      criteria,
+      stats: {
+        PTS: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0,
+        FGM: 0, FGA: 0, FG_PCT: 0,
+        TPM: 0, TPA: 0, TP_PCT: 0,
+        FTM: 0, FTA: 0, FT_PCT: 0,
+      },
+      timestamp: new Date().toISOString(),
+    };
+  },
+}));
+
 export interface PlayerStats {
   PTS: number;
   '2PT_MADE': number;
