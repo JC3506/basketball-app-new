@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from 'next/link'
@@ -19,7 +20,7 @@ export default function Navbar({ title = 'Basketball Data App' }: NavbarProps) {
           </Link>
         </div>
         
-        <nav className="flex items-center space-x-4">
+        <nav className="flex flex-wrap items-center space-x-2 md:space-x-4">
           <Link 
             href="/" 
             className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -49,6 +50,26 @@ export default function Navbar({ title = 'Basketball Data App' }: NavbarProps) {
             }`}
           >
             Dashboard
+          </Link>
+          <Link 
+            href="/statistics" 
+            className={`px-3 py-2 rounded-md text-sm font-medium ${
+              pathname === '/statistics' 
+                ? 'bg-primary-800 text-white' 
+                : 'text-white/80 hover:bg-primary-600 hover:text-white'
+            }`}
+          >
+            Statistics
+          </Link>
+          <Link 
+            href="/reports" 
+            className={`px-3 py-2 rounded-md text-sm font-medium ${
+              pathname === '/reports' 
+                ? 'bg-primary-800 text-white' 
+                : 'text-white/80 hover:bg-primary-600 hover:text-white'
+            }`}
+          >
+            Reports
           </Link>
         </nav>
       </div>
