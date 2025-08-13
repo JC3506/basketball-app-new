@@ -1,206 +1,225 @@
 
-'use client'
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-import { useState } from 'react'
-import { Game, Player, PlayerStats } from '@/lib/store'
-
-interface EnhancedAIInsightsProps {
-  game: Game;
+:root {
+  --primary-color: #0369a1;
+  --secondary-color: #a21caf;
+  --accent-color: #f59e0b;
+  --background-light: #f8fafc;
+  --background-dark: #0f172a;
+  --text-light: #1e293b;
+  --text-dark: #f1f5f9;
 }
 
-export default function EnhancedAIInsights({ game }: EnhancedAIInsightsProps) {
-  const [activeTab, setActiveTab] = useState<'shooting' | 'chemistry' | 'defense'>('shooting')
-  
-  // Generate shooting efficiency insights
-  const generateShootingInsights = () => {
-    const insights = []
-    
-    // Team shooting insights
-    let totalFGAttempts = 0
-    let totalFGMade = 0
-    let total3PTAttempts = 0
-    let total3PTMade = 0
-    
-    Object.entries(game.playerStats).forEach(([playerId, stats]) => {
-      totalFGAttempts += stats['2PT_MADE'] + stats['2PT_MISS'] + stats['3PT_MADE'] + stats['3PT_MISS']
-      totalFGMade += stats['2PT_MADE'] + stats['3PT_MADE']
-      total3PTAttempts += stats['3PT_MADE'] + stats['3PT_MISS']
-      total3PTMade += stats['3PT_MADE']
-    })
-    
-    const fgPercentage = totalFGAttempts > 0 ? (totalFGMade / totalFGAttempts) * 100 : 0
-    const threePtPercentage = total3PTAttempts > 0 ? (total3PTMade / total3PTAttempts) * 100 : 0
-    
-    // Team shooting insights
-    if (fgPercentage > 50) {
-      insights.push({
-        type: 'positive',
-        text: `Team shooting efficiency is excellent at ${fgPercentage.toFixed(1)}%. Continue to focus on high-percentage shots.`
-      })
-    } else if (fgPercentage < 40) {
-      insights.push({
-        type: 'negative',
-        text: `Team shooting efficiency is low at ${fgPercentage.toFixed(1)}%. Consider working on shot selection and offensive execution.`
-      })
-    }
-    
-    if (threePtPercentage > 40) {
-      insights.push({
-        type: 'positive',
-        text: `Three-point shooting is strong at ${threePtPercentage.toFixed(1)}%. Leverage this advantage by creating more perimeter opportunities.`
-      })
-    } else if (threePtPercentage < 30 && total3PTAttempts > 10) {
-      insights.push({
-        type: 'negative',
-        text: `Three-point shooting is struggling at ${threePtPercentage.toFixed(1)}%. Consider focusing more on inside scoring or mid-range shots.`
-      })
-    }
-    
-    // Individual player insights
-    game.players.forEach(player => {
-      const stats = game.playerStats[player.id]
-      if (!stats) return
-      
-      const twoPointAttempts = stats['2PT_MADE'] + stats['2PT_MISS']
-      const twoPointPercentage = twoPointAttempts > 0 ? (stats['2PT_MADE'] / twoPointAttempts) * 100 : 0
-      
-      const threePointAttempts = stats['3PT_MADE'] + stats['3PT_MISS']
-      const threePointPercentage = threePointAttempts > 0 ? (stats['3PT_MADE'] / threePointAttempts) * 100 : 0
-      
-      if (twoPointAttempts >= 5 && twoPointPercentage > 60) {
-        insights.push({
-          type: 'positive',
-          text: `${player.name} is highly efficient in the paint (${twoPointPercentage.toFixed(1)}%). Consider running more plays for them inside.`
-        })
-      }
-      
-      if (threePointAttempts >= 4 && threePointPercentage > 50) {
-        insights.push({
-          type: 'positive',
-          text: `${player.name} is hot from beyond the arc (${threePointPercentage.toFixed(1)}%). Create more three-point opportunities for them.`
-        })
-      }
-      
-      if (twoPointAttempts >= 5 && twoPointPercentage < 30) {
-        insights.push({
-          type: 'negative',
-          text: `${player.name} is struggling with inside shots (${twoPointPercentage.toFixed(1)}%). Consider adjusting their role in the offense.`
-        })
-      }
-    })
-    
-    return insights.length > 0 ? insights : [{ type: 'neutral', text: 'No significant shooting patterns detected yet.' }]
+body {
+  @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-bold py-2 px-4 rounded shadow transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50;
   }
   
-  // Generate player chemistry insights
-  const generateChemistryInsights = () => {
-    // In a real implementation, this would analyze assist patterns, lineup effectiveness, etc.
-    // For now, we'll generate some sample insights
-    const insights = [
-      {
-        type: 'positive',
-        text: 'Players #23 and #30 have connected on 5 assists this game, showing excellent chemistry on the perimeter.'
-      },
-      {
-        type: 'positive',
-        text: 'The starting lineup has outscored opponents by 12 points in 15 minutes of play.'
-      },
-      {
-        type: 'negative',
-        text: 'The bench unit is struggling with a -8 point differential. Consider adjusting rotations.'
-      },
-      {
-        type: 'neutral',
-        text: 'Small-ball lineup with #6 at center has shown promising ball movement but needs to improve rebounding.'
-      }
-    ]
-    
-    return insights
+  .btn-secondary {
+    @apply bg-secondary-600 hover:bg-secondary-700 text-white font-bold py-2 px-4 rounded shadow transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-opacity-50;
   }
   
-  // Generate defensive adjustment insights
-  const generateDefensiveInsights = () => {
-    // In a real implementation, this would analyze opponent tendencies, defensive stats, etc.
-    // For now, we'll generate some sample insights
-    const insights = [
-      {
-        type: 'negative',
-        text: 'Opponent is shooting 45% from three-point range. Consider tighter perimeter defense.'
-      },
-      {
-        type: 'positive',
-        text: 'Zone defense has limited opponent's inside scoring to 32% efficiency in the paint.'
-      },
-      {
-        type: 'neutral',
-        text: 'Opponent's #10 has scored 15 points in the last quarter. Consider assigning #6 as primary defender.'
-      },
-      {
-        type: 'negative',
-        text: 'Team has allowed 8 offensive rebounds. Box out needs improvement, especially from the guards.'
-      }
-    ]
-    
-    return insights
+  .btn-accent {
+    @apply bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded shadow transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-opacity-50;
   }
   
-  const activeInsights = () => {
-    switch (activeTab) {
-      case 'shooting':
-        return generateShootingInsights()
-      case 'chemistry':
-        return generateChemistryInsights()
-      case 'defense':
-        return generateDefensiveInsights()
-      default:
-        return []
-    }
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 transition duration-300 ease-in-out hover:shadow-lg;
   }
   
-  return (
-    <div className="card">
-      <h2 className="text-xl font-bold mb-4">AI Insights</h2>
-      
-      <div className="flex border-b mb-4">
-        <button 
-          className={`py-2 px-4 font-medium ${activeTab === 'shooting' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-primary-600'}`}
-          onClick={() => setActiveTab('shooting')}
-        >
-          Shooting
-        </button>
-        <button 
-          className={`py-2 px-4 font-medium ${activeTab === 'chemistry' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-primary-600'}`}
-          onClick={() => setActiveTab('chemistry')}
-        >
-          Chemistry
-        </button>
-        <button 
-          className={`py-2 px-4 font-medium ${activeTab === 'defense' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-primary-600'}`}
-          onClick={() => setActiveTab('defense')}
-        >
-          Defense
-        </button>
-      </div>
-      
-      <div className="space-y-3">
-        {activeInsights().map((insight, index) => (
-          <div 
-            key={index} 
-            className={`p-3 rounded-lg ${
-              insight.type === 'positive' ? 'bg-green-50 border-l-4 border-green-500 dark:bg-green-900/20' : 
-              insight.type === 'negative' ? 'bg-red-50 border-l-4 border-red-500 dark:bg-red-900/20' : 
-              'bg-blue-50 border-l-4 border-blue-500 dark:bg-blue-900/20'
-            }`}
-          >
-            <p className="text-sm">
-              {insight.type === 'positive' && <span className="font-bold text-green-600 dark:text-green-400">STRENGTH: </span>}
-              {insight.type === 'negative' && <span className="font-bold text-red-600 dark:text-red-400">OPPORTUNITY: </span>}
-              {insight.type === 'neutral' && <span className="font-bold text-blue-600 dark:text-blue-400">INSIGHT: </span>}
-              {insight.text}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  .card-header {
+    @apply text-xl font-bold mb-4 pb-2 border-b border-gray-200 dark:border-gray-700;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100;
+  }
+  
+  .stat-card {
+    @apply flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700;
+  }
+  
+  .stat-value {
+    @apply text-3xl font-bold text-primary-600 dark:text-primary-400;
+  }
+  
+  .stat-label {
+    @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
+  }
+  
+  .nav-link {
+    @apply px-3 py-2 rounded-md text-sm font-medium transition duration-200 ease-in-out;
+  }
+  
+  .nav-link-active {
+    @apply bg-primary-800 text-white;
+  }
+  
+  .nav-link-inactive {
+    @apply text-white/80 hover:bg-primary-600 hover:text-white;
+  }
+  
+  .table-container {
+    @apply overflow-x-auto rounded-lg shadow;
+  }
+  
+  .data-table {
+    @apply min-w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden;
+  }
+  
+  .table-header {
+    @apply bg-gray-100 dark:bg-gray-700;
+  }
+  
+  .table-header-cell {
+    @apply py-3 px-4 text-left font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider;
+  }
+  
+  .table-row {
+    @apply border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition duration-150 ease-in-out;
+  }
+  
+  .table-cell {
+    @apply py-3 px-4;
+  }
+  
+  .chart-container {
+    @apply bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700;
+  }
+  
+  .shot-chart-court {
+    @apply relative bg-amber-100 dark:bg-amber-900 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600;
+  }
+  
+  .shot-made {
+    @apply absolute w-3 h-3 rounded-full bg-green-500 transform -translate-x-1/2 -translate-y-1/2;
+  }
+  
+  .shot-missed {
+    @apply absolute w-3 h-3 rounded-full bg-red-500 transform -translate-x-1/2 -translate-y-1/2;
+  }
+  
+  .insight-card {
+    @apply p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800 mb-2;
+  }
+  
+  .warning-insight {
+    @apply p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 mb-2;
+  }
+  
+  .positive-insight {
+    @apply p-3 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800 mb-2;
+  }
+  
+  .negative-insight {
+    @apply p-3 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800 mb-2;
+  }
+  
+  .tab-button {
+    @apply py-2 px-4 font-bold transition duration-200 ease-in-out;
+  }
+  
+  .tab-active {
+    @apply text-primary-600 border-b-2 border-primary-600;
+  }
+  
+  .tab-inactive {
+    @apply text-gray-500 hover:text-primary-600 border-b-2 border-transparent hover:border-primary-300;
+  }
+}
+
+/* Shot Chart Court Styling */
+.basketball-court {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 94%; /* NBA court ratio */
+  background-color: #f8d49a;
+  border: 2px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.court-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  stroke: #333;
+  stroke-width: 2;
+  fill: none;
+}
+
+.three-point-line {
+  fill: none;
+  stroke: #333;
+  stroke-width: 2;
+}
+
+.free-throw-line {
+  fill: none;
+  stroke: #333;
+  stroke-width: 2;
+}
+
+.key {
+  fill: none;
+  stroke: #333;
+  stroke-width: 2;
+}
+
+.center-circle {
+  fill: none;
+  stroke: #333;
+  stroke-width: 2;
+}
+
+.backboard {
+  fill: none;
+  stroke: #333;
+  stroke-width: 3;
+}
+
+.rim {
+  fill: none;
+  stroke: #e53e3e;
+  stroke-width: 2;
+}
+
+/* Heat Map Styling */
+.heat-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.heat-map-zone {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.heat-map-zone:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+/* Responsive Typography */
+@media (max-width: 640px) {
+  .stat-value {
+    @apply text-2xl;
+  }
+  
+  .card-header {
+    @apply text-lg;
+  }
 }
