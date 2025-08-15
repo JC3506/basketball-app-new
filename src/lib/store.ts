@@ -1,4 +1,3 @@
-
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { v4 as uuidv4 } from 'uuid'
@@ -12,11 +11,23 @@ export interface Player {
   isActive: boolean;
 }
 
-// store.ts
+export interface Shot {
+  id: string;
+  x: number;
+  y: number;
+  made: boolean;
+  playerId: string;
+  defenderId?: string;
+  shotType: '2PT' | '3PT' | 'FT';
+  quarter: number;
+  timestamp: string;
+  gameId: string;
+  position?: {
+    zone: string;
+    distance: number;
+  };
+}
 
-import { v4 as uuidv4 } from 'uuid';
-
-// 🧩 Type Definitions
 export interface ComparisonCriteria {
   dateRange: 'all' | 'last5' | 'last10' | 'custom';
   customDateStart?: string;
@@ -48,65 +59,6 @@ export interface ComparisonResult {
   };
   timestamp: string;
 }
-
-// 🏀 Extend BasketballStore Interface
-interface BasketballStore {
-  // ...existing properties
-
-  savedComparisons: ComparisonResult[];
-  createComparison: (name: string, criteria: ComparisonCriteria) => string;
-  deleteComparison: (id: string) => void;
-  getComparisonData: (criteria: ComparisonCriteria) => ComparisonResult;
-}
-
-// ⚙️ Store Implementation
-const useBasketballStore = create<BasketballStore>((set, get) => ({
-  // ...existing state and methods
-
-  savedComparisons: [],
-
-  createComparison: (name, criteria) => {
-    const id = uuidv4();
-    const comparisonData = get().getComparisonData(criteria);
-
-    const newComparison: ComparisonResult = {
-      id,
-      name,
-      criteria,
-      stats: comparisonData.stats,
-      timestamp: new Date().toISOString(),
-    };
-
-    set(state => ({
-      savedComparisons: [...state.savedComparisons, newComparison],
-    }));
-
-    return id;
-  },
-
-  deleteComparison: (id) => {
-    set(state => ({
-      savedComparisons: state.savedComparisons.filter(comp => comp.id !== id),
-    }));
-  },
-
-  getComparisonData: (criteria) => {
-    // TODO: Implement logic from team-comparison-feature.md
-    // Placeholder return for now
-    return {
-      id: 'temp',
-      name: 'Temporary',
-      criteria,
-      stats: {
-        PTS: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0,
-        FGM: 0, FGA: 0, FG_PCT: 0,
-        TPM: 0, TPA: 0, TP_PCT: 0,
-        FTM: 0, FTA: 0, FT_PCT: 0,
-      },
-      timestamp: new Date().toISOString(),
-    };
-  },
-}));
 
 export interface PlayerStats {
   PTS: number;
@@ -141,6 +93,7 @@ export interface Game {
   timeRemaining: string;
   status: 'in-progress' | 'completed';
   insights: string[];
+  shots: Shot[]; // Added shots array
 }
 
 interface BasketballStore {
@@ -159,6 +112,21 @@ interface BasketballStore {
   
   // Stat actions
   recordStat: (gameId: string, playerId: string, statType: keyof PlayerStats, value?: number) => void;
+  
+  // Shot tracking
+  recordShot: (
+    gameId: string,
+    shot: Omit<Shot, 'id' | 'timestamp' | 'gameId' | 'position'>
+  ) => void;
+  
+  getShotsByGame: (gameId: string) => Shot[];
+  getShotsByPlayer: (gameId: string, playerId: string) => Shot[];
+  getShotEfficiency: (shots: Shot[]) => {
+    made: number;
+    missed: number;
+    total: number;
+    efficiency: number;
+  };
   
   // Insight actions
   addInsight: (gameId: string, insight: string) => void;
@@ -218,7 +186,8 @@ export const useBasketballStore = create<BasketballStore>()(
           quarter: 1,
           timeRemaining: '12:00',
           status: 'in-progress',
-          insights: []
+          insights: [],
+          shots: [] // Initialize empty shots array
         }
         
         set(state => ({
@@ -375,6 +344,117 @@ export const useBasketballStore = create<BasketballStore>()(
               }
             : state.currentGame
         }))
+      },
+      
+      // Shot tracking functions
+      recordShot: (gameId, shot) => {
+        const game = get().getGame(gameId);
+        if (!game) return;
+        
+        // Generate shot ID
+        const shotId = uuidv4();
+        
+        // Calculate shot position data
+        const courtWidth = 500;
+        const courtHeight = 470;
+        const basketY = 25;
+        
+        // Determine shot zone
+        let zone = '';
+        const distanceFromBasket = Math.sqrt(
+          Math.pow(shot.x - courtWidth/2, 2) + 
+          Math.pow(shot.y - basketY, 2)
+        );
+        
+        // Determine zone based on position
+        if (shot.y < 190 && Math.abs(shot.x - courtWidth/2) < 80) {
+          zone = 'Paint';
+        } else if (distanceFromBasket > 237.5) {
+          if (shot.y > courtHeight - 50) {
+            if (shot.x < courtWidth/2) {
+              zone = 'Left Corner 3';
+            } else {
+              zone = 'Right Corner 3';
+            }
+          } else {
+            zone = 'Above Break 3';
+          }
+        } else {
+          if (shot.x < courtWidth/2) {
+            zone = 'Mid-Range Left';
+          } else {
+            zone = 'Mid-Range Right';
+          }
+        }
+        
+        // Create complete shot object
+        const newShot: Shot = {
+          id: shotId,
+          gameId,
+          timestamp: new Date().toISOString(),
+          position: {
+            zone,
+            distance: distanceFromBasket
+          },
+          ...shot
+        };
+        
+        // Update player stats based on shot
+        if (shot.shotType === '2PT' && shot.made) {
+          get().recordStat(gameId, shot.playerId, '2PT_MADE');
+        } else if (shot.shotType === '2PT' && !shot.made) {
+          get().recordStat(gameId, shot.playerId, '2PT_MISS');
+        } else if (shot.shotType === '3PT' && shot.made) {
+          get().recordStat(gameId, shot.playerId, '3PT_MADE');
+        } else if (shot.shotType === '3PT' && !shot.made) {
+          get().recordStat(gameId, shot.playerId, '3PT_MISS');
+        } else if (shot.shotType === 'FT' && shot.made) {
+          get().recordStat(gameId, shot.playerId, 'FT_MADE');
+        } else if (shot.shotType === 'FT' && !shot.made) {
+          get().recordStat(gameId, shot.playerId, 'FT_MISS');
+        }
+        
+        // Update game state with new shot
+        set(state => ({
+          games: state.games.map(g => 
+            g.id === gameId 
+              ? { 
+                  ...g, 
+                  shots: [...(g.shots || []), newShot] 
+                }
+              : g
+          ),
+          currentGame: state.currentGame?.id === gameId 
+            ? { 
+                ...state.currentGame, 
+                shots: [...(state.currentGame.shots || []), newShot] 
+              }
+            : state.currentGame
+        }));
+      },
+      
+      getShotsByGame: (gameId) => {
+        const game = get().getGame(gameId);
+        return game?.shots || [];
+      },
+      
+      getShotsByPlayer: (gameId, playerId) => {
+        const shots = get().getShotsByGame(gameId);
+        return shots.filter(shot => shot.playerId === playerId);
+      },
+      
+      getShotEfficiency: (shots) => {
+        const made = shots.filter(shot => shot.made).length;
+        const total = shots.length;
+        const missed = total - made;
+        const efficiency = total > 0 ? (made / total) * 100 : 0;
+        
+        return {
+          made,
+          missed,
+          total,
+          efficiency
+        };
       },
       
       addInsight: (gameId, insight) => {
