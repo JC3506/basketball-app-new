@@ -1,6 +1,6 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { v4 as uuidv4 } from 'uuid'
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define types
 export interface Player {
@@ -26,38 +26,6 @@ export interface Shot {
     zone: string;
     distance: number;
   };
-}
-
-export interface ComparisonCriteria {
-  dateRange: 'all' | 'last5' | 'last10' | 'custom';
-  customDateStart?: string;
-  customDateEnd?: string;
-  gameIds?: string[];
-  lineupIds?: string[];
-}
-
-export interface ComparisonResult {
-  id: string;
-  name: string;
-  criteria: ComparisonCriteria;
-  stats: {
-    PTS: number;
-    REB: number;
-    AST: number;
-    STL: number;
-    BLK: number;
-    TO: number;
-    FGM: number;
-    FGA: number;
-    FG_PCT: number;
-    TPM: number;
-    TPA: number;
-    TP_PCT: number;
-    FTM: number;
-    FTA: number;
-    FT_PCT: number;
-  };
-  timestamp: string;
 }
 
 export interface PlayerStats {
@@ -93,32 +61,43 @@ export interface Game {
   timeRemaining: string;
   status: 'in-progress' | 'completed';
   insights: string[];
-  shots: Shot[]; // Added shots array
+  shots: Shot[]; // Add shots array to Game interface
 }
 
 interface BasketballStore {
   games: Game[];
   currentGame: Game | null;
-  
+
   // Game actions
   createGame: (name: string, team: string, opponent: string, players: Player[]) => string;
   updateGameScore: (gameId: string, team: 'team' | 'opponent', points: number) => void;
   updateGameStatus: (gameId: string, status: 'in-progress' | 'completed') => void;
   updateGameQuarter: (gameId: string, quarter: number) => void;
   updateGameTime: (gameId: string, timeRemaining: string) => void;
-  
+
   // Player actions
   togglePlayerActive: (gameId: string, playerId: string) => void;
-  
+
   // Stat actions
   recordStat: (gameId: string, playerId: string, statType: keyof PlayerStats, value?: number) => void;
-  
+
+  // Insight actions
+  addInsight: (gameId: string, insight: string) => void;
+
+  // Helper functions
+  getGame: (gameId: string) => Game | undefined;
+  getPlayerStats: (gameId: string, playerId: string) => PlayerStats | undefined;
+  calculatePlayerEfficiency: (stats: PlayerStats) => number;
+
+  // Add the generateInsights function to the interface
+  generateInsights: (gameId: string, playerId: string, stats: PlayerStats) => void;
+
   // Shot tracking
   recordShot: (
     gameId: string,
     shot: Omit<Shot, 'id' | 'timestamp' | 'gameId' | 'position'>
   ) => void;
-  
+
   getShotsByGame: (gameId: string) => Shot[];
   getShotsByPlayer: (gameId: string, playerId: string) => Shot[];
   getShotEfficiency: (shots: Shot[]) => {
@@ -127,17 +106,6 @@ interface BasketballStore {
     total: number;
     efficiency: number;
   };
-  
-  // Insight actions
-  addInsight: (gameId: string, insight: string) => void;
-  
-  // Helper functions
-  getGame: (gameId: string) => Game | undefined;
-  getPlayerStats: (gameId: string, playerId: string) => PlayerStats | undefined;
-  calculatePlayerEfficiency: (stats: PlayerStats) => number;
-  
-  // Add the generateInsights function to the interface
-  generateInsights: (gameId: string, playerId: string, stats: PlayerStats) => void;
 }
 
 // Initialize empty player stats
@@ -155,8 +123,8 @@ export const initPlayerStats = (): PlayerStats => ({
   STL: 0,
   BLK: 0,
   TO: 0,
-  FOUL: 0
-})
+  FOUL: 0,
+});
 
 // Create the store
 export const useBasketballStore = create<BasketballStore>()(
@@ -164,16 +132,16 @@ export const useBasketballStore = create<BasketballStore>()(
     (set, get) => ({
       games: [],
       currentGame: null,
-      
+
       createGame: (name, team, opponent, players) => {
-        const gameId = uuidv4()
-        const playerStats: Record<string, PlayerStats> = {}
-        
+        const gameId = uuidv4();
+        const playerStats: Record<string, PlayerStats> = {};
+
         // Initialize stats for each player
         players.forEach(player => {
-          playerStats[player.id] = initPlayerStats()
-        })
-        
+          playerStats[player.id] = initPlayerStats();
+        });
+
         const newGame: Game = {
           id: gameId,
           name,
@@ -187,191 +155,242 @@ export const useBasketballStore = create<BasketballStore>()(
           timeRemaining: '12:00',
           status: 'in-progress',
           insights: [],
-          shots: [] // Initialize empty shots array
-        }
-        
-        set(state => ({
-          games: [...state.games, newGame],
-          currentGame: newGame
-        }))
-        
-        return gameId
+          shots: [], // Initialize empty shots array
+        };
+
+        set(state => ({ games: [...state.games, newGame], currentGame: newGame }));
+
+        return gameId;
       },
-      
+
       updateGameScore: (gameId, team, points) => {
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId 
-              ? { 
-                  ...game, 
-                  score: { 
-                    ...game.score, 
-                    [team]: game.score[team] + points 
-                  } 
-                }
+          games: state.games.map(game =>
+            game.id === gameId
+              ? { ...game, score: { ...game.score, [team]: game.score[team] + points } }
               : game
           ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                score: { 
-                  ...state.currentGame.score, 
-                  [team]: state.currentGame.score[team] + points 
-                } 
-              }
-            : state.currentGame
-        }))
+          currentGame:
+            state.currentGame?.id === gameId
+              ? { ...state.currentGame, score: { ...state.currentGame.score, [team]: state.currentGame.score[team] + points } }
+              : state.currentGame,
+        }));
       },
-      
+
       updateGameStatus: (gameId, status) => {
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId ? { ...game, status } : game
-          ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { ...state.currentGame, status } 
-            : state.currentGame
-        }))
+          games: state.games.map(game => (game.id === gameId ? { ...game, status } : game)),
+          currentGame:
+            state.currentGame?.id === gameId ? { ...state.currentGame, status } : state.currentGame,
+        }));
       },
-      
+
       updateGameQuarter: (gameId, quarter) => {
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId ? { ...game, quarter } : game
-          ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { ...state.currentGame, quarter } 
-            : state.currentGame
-        }))
+          games: state.games.map(game => (game.id === gameId ? { ...game, quarter } : game)),
+          currentGame:
+            state.currentGame?.id === gameId ? { ...state.currentGame, quarter } : state.currentGame,
+        }));
       },
-      
+
       updateGameTime: (gameId, timeRemaining) => {
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId ? { ...game, timeRemaining } : game
-          ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { ...state.currentGame, timeRemaining } 
-            : state.currentGame
-        }))
+          games: state.games.map(game => (game.id === gameId ? { ...game, timeRemaining } : game)),
+          currentGame:
+            state.currentGame?.id === gameId ? { ...state.currentGame, timeRemaining } : state.currentGame,
+        }));
       },
-      
+
       togglePlayerActive: (gameId, playerId) => {
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId 
-              ? { 
-                  ...game, 
-                  players: game.players.map(player => 
-                    player.id === playerId 
-                      ? { ...player, isActive: !player.isActive } 
-                      : player
-                  ) 
+          games: state.games.map(game =>
+            game.id === gameId
+              ? {
+                  ...game,
+                  players: game.players.map(player =>
+                    player.id === playerId ? { ...player, isActive: !player.isActive } : player
+                  ),
                 }
               : game
           ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                players: state.currentGame.players.map(player => 
-                  player.id === playerId 
-                    ? { ...player, isActive: !player.isActive } 
-                    : player
-                ) 
-              }
-            : state.currentGame
-        }))
+          currentGame:
+            state.currentGame?.id === gameId
+              ? {
+                  ...state.currentGame,
+                  players: state.currentGame.players.map(player =>
+                    player.id === playerId ? { ...player, isActive: !player.isActive } : player
+                  ),
+                }
+              : state.currentGame,
+        }));
       },
-      
+
       recordStat: (gameId, playerId, statType, value = 1) => {
-        const game = get().getGame(gameId)
-        if (!game) return
-        
-        const playerStats = { ...game.playerStats[playerId] }
-        
+        const game = get().getGame(gameId);
+        if (!game) return;
+
+        const playerStats = { ...game.playerStats[playerId] };
+
         // Handle different stat types
         switch (statType) {
           case '2PT_MADE':
-            playerStats['2PT_MADE'] += value
-            playerStats.PTS += 2 * value
-            break
+            playerStats['2PT_MADE'] += value;
+            playerStats.PTS += 2 * value;
+            break;
           case '2PT_MISS':
-            playerStats['2PT_MISS'] += value
-            break
+            playerStats['2PT_MISS'] += value;
+            break;
           case '3PT_MADE':
-            playerStats['3PT_MADE'] += value
-            playerStats.PTS += 3 * value
-            break
+            playerStats['3PT_MADE'] += value;
+            playerStats.PTS += 3 * value;
+            break;
           case '3PT_MISS':
-            playerStats['3PT_MISS'] += value
-            break
+            playerStats['3PT_MISS'] += value;
+            break;
           case 'FT_MADE':
-            playerStats['FT_MADE'] += value
-            playerStats.PTS += value
-            break
+            playerStats['FT_MADE'] += value;
+            playerStats.PTS += value;
+            break;
           case 'FT_MISS':
-            playerStats['FT_MISS'] += value
-            break
+            playerStats['FT_MISS'] += value;
+            break;
           default:
-            playerStats[statType] += value
+            playerStats[statType] += value;
         }
-        
+
         // Generate insights based on stats
-        const player = game.players.find(p => p.id === playerId)
+        const player = game.players.find(p => p.id === playerId);
         if (player) {
-          get().generateInsights(gameId, playerId, playerStats)
+          get().generateInsights(gameId, playerId, playerStats);
         }
-        
+
         set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId 
-              ? { 
-                  ...game, 
-                  playerStats: { 
-                    ...game.playerStats, 
-                    [playerId]: playerStats 
-                  } 
-                }
+          games: state.games.map(game =>
+            game.id === gameId
+              ? { ...game, playerStats: { ...game.playerStats, [playerId]: playerStats } }
               : game
           ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                playerStats: { 
-                  ...state.currentGame.playerStats, 
-                  [playerId]: playerStats 
-                } 
-              }
-            : state.currentGame
-        }))
+          currentGame:
+            state.currentGame?.id === gameId
+              ? {
+                  ...state.currentGame,
+                  playerStats: { ...state.currentGame.playerStats, [playerId]: playerStats },
+                }
+              : state.currentGame,
+        }));
       },
-      
-      // Shot tracking functions
+
+      addInsight: (gameId, insight) => {
+        set(state => ({
+          games: state.games.map(game =>
+            game.id === gameId
+              ? { ...game, insights: [...game.insights, insight].slice(-5) } // Keep only the 5 most recent insights
+              : game
+          ),
+          currentGame:
+            state.currentGame?.id === gameId
+              ? { ...state.currentGame, insights: [...state.currentGame.insights, insight].slice(-5) }
+              : state.currentGame,
+        }));
+      },
+
+      getGame: (gameId) => {
+        return get().games.find(game => game.id === gameId);
+      },
+
+      getPlayerStats: (gameId, playerId) => {
+        const game = get().getGame(gameId);
+        return game ? game.playerStats[playerId] : undefined;
+      },
+
+      calculatePlayerEfficiency: (stats) => {
+        return (
+          stats.PTS +
+          stats['REB_OFF'] +
+          stats['REB_DEF'] +
+          stats.AST +
+          stats.STL +
+          stats.BLK -
+          stats.TO -
+          (stats['2PT_MISS'] + stats['3PT_MISS'] + stats['FT_MISS'])
+        );
+      },
+
+      // Implementation of the generateInsights function
+      generateInsights: (gameId, playerId, stats) => {
+        const game = get().getGame(gameId);
+        if (!game) return;
+
+        const player = game.players.find(p => p.id === playerId);
+        if (!player) return;
+
+        const newInsights: string[] = [];
+
+        // Shooting efficiency insights
+        const twoPointAttempts = stats['2PT_MADE'] + stats['2PT_MISS'];
+        const twoPointPercentage =
+          twoPointAttempts > 0 ? (stats['2PT_MADE'] / twoPointAttempts) * 100 : 0;
+
+        const threePointAttempts = stats['3PT_MADE'] + stats['3PT_MISS'];
+        const threePointPercentage =
+          threePointAttempts > 0 ? (stats['3PT_MADE'] / threePointAttempts) * 100 : 0;
+
+        // Generate insights based on performance
+        if (twoPointAttempts >= 5 && twoPointPercentage < 30) {
+          newInsights.push(
+            `${player.name} is struggling with 2PT shots (${twoPointPercentage.toFixed(
+              1
+            )}%). Consider running plays for better shot selection.`
+          );
+        }
+
+        if (threePointAttempts >= 3 && threePointPercentage > 50) {
+          newInsights.push(
+            `${player.name} is hot from 3PT range (${threePointPercentage.toFixed(
+              1
+            )}%). Look for more opportunities beyond the arc.`
+          );
+        }
+
+        if (stats.TO >= 3) {
+          newInsights.push(`${player.name} has ${stats.TO} turnovers. Consider adjusting ball-handling responsibilities.`);
+        }
+
+        if (stats.FOUL >= 4) {
+          newInsights.push(`⚠️ ${player.name} has ${stats.FOUL} fouls. Consider substitution to avoid fouling out.`);
+        }
+
+        // Only add new unique insights if (newInsights.length > 0) {
+        // Add only one insight at a time to avoid flooding
+        const randomInsight = newInsights[Math.floor(Math.random() * newInsights.length)];
+        get().addInsight(gameId, randomInsight);
+        // }
+      },
+
       recordShot: (gameId, shot) => {
         const game = get().getGame(gameId);
         if (!game) return;
-        
+
         // Generate shot ID
         const shotId = uuidv4();
-        
+
         // Calculate shot position data
         const courtWidth = 500;
         const courtHeight = 470;
         const basketY = 25;
-        
+
         // Determine shot zone
         let zone = '';
         const distanceFromBasket = Math.sqrt(
-          Math.pow(shot.x - courtWidth/2, 2) + 
-          Math.pow(shot.y - basketY, 2)
+          Math.pow(shot.x - courtWidth / 2, 2) + Math.pow(shot.y - basketY, 2)
         );
-        
+
         // Determine zone based on position
-        if (shot.y < 190 && Math.abs(shot.x - courtWidth/2) < 80) {
+        if (shot.y < 190 && Math.abs(shot.x - courtWidth / 2) < 80) {
           zone = 'Paint';
         } else if (distanceFromBasket > 237.5) {
           if (shot.y > courtHeight - 50) {
-            if (shot.x < courtWidth/2) {
+            if (shot.x < courtWidth / 2) {
               zone = 'Left Corner 3';
             } else {
               zone = 'Right Corner 3';
@@ -380,25 +399,22 @@ export const useBasketballStore = create<BasketballStore>()(
             zone = 'Above Break 3';
           }
         } else {
-          if (shot.x < courtWidth/2) {
+          if (shot.x < courtWidth / 2) {
             zone = 'Mid-Range Left';
           } else {
             zone = 'Mid-Range Right';
           }
         }
-        
+
         // Create complete shot object
         const newShot: Shot = {
           id: shotId,
           gameId,
           timestamp: new Date().toISOString(),
-          position: {
-            zone,
-            distance: distanceFromBasket
-          },
-          ...shot
+          position: { zone, distance: distanceFromBasket },
+          ...shot,
         };
-        
+
         // Update player stats based on shot
         if (shot.shotType === '2PT' && shot.made) {
           get().recordStat(gameId, shot.playerId, '2PT_MADE');
@@ -413,126 +429,40 @@ export const useBasketballStore = create<BasketballStore>()(
         } else if (shot.shotType === 'FT' && !shot.made) {
           get().recordStat(gameId, shot.playerId, 'FT_MISS');
         }
-        
+
         // Update game state with new shot
         set(state => ({
-          games: state.games.map(g => 
-            g.id === gameId 
-              ? { 
-                  ...g, 
-                  shots: [...(g.shots || []), newShot] 
-                }
-              : g
+          games: state.games.map(g =>
+            g.id === gameId ? { ...g, shots: [...(g.shots || []), newShot] } : g
           ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                shots: [...(state.currentGame.shots || []), newShot] 
-              }
-            : state.currentGame
+          currentGame:
+            state.currentGame?.id === gameId
+              ? { ...state.currentGame, shots: [...(state.currentGame.shots || []), newShot] }
+              : state.currentGame,
         }));
       },
-      
+
       getShotsByGame: (gameId) => {
         const game = get().getGame(gameId);
         return game?.shots || [];
       },
-      
+
       getShotsByPlayer: (gameId, playerId) => {
         const shots = get().getShotsByGame(gameId);
         return shots.filter(shot => shot.playerId === playerId);
       },
-      
+
       getShotEfficiency: (shots) => {
         const made = shots.filter(shot => shot.made).length;
         const total = shots.length;
         const missed = total - made;
         const efficiency = total > 0 ? (made / total) * 100 : 0;
-        
-        return {
-          made,
-          missed,
-          total,
-          efficiency
-        };
+
+        return { made, missed, total, efficiency };
       },
-      
-      addInsight: (gameId, insight) => {
-        set(state => ({
-          games: state.games.map(game => 
-            game.id === gameId 
-              ? { 
-                  ...game, 
-                  insights: [...game.insights, insight].slice(-5) // Keep only the 5 most recent insights
-                }
-              : game
-          ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                insights: [...state.currentGame.insights, insight].slice(-5)
-              }
-            : state.currentGame
-        }))
-      },
-      
-      getGame: (gameId) => {
-        return get().games.find(game => game.id === gameId)
-      },
-      
-      getPlayerStats: (gameId, playerId) => {
-        const game = get().getGame(gameId)
-        return game ? game.playerStats[playerId] : undefined
-      },
-      
-      calculatePlayerEfficiency: (stats) => {
-        return stats.PTS + stats['REB_OFF'] + stats['REB_DEF'] + stats.AST + stats.STL + stats.BLK - stats.TO - (stats['2PT_MISS'] + stats['3PT_MISS'] + stats['FT_MISS'])
-      },
-      
-      // Implementation of the generateInsights function
-      generateInsights: (gameId, playerId, stats) => {
-        const game = get().getGame(gameId)
-        if (!game) return
-        
-        const player = game.players.find(p => p.id === playerId)
-        if (!player) return
-        
-        const newInsights: string[] = []
-        
-        // Shooting efficiency insights
-        const twoPointAttempts = stats['2PT_MADE'] + stats['2PT_MISS']
-        const twoPointPercentage = twoPointAttempts > 0 ? (stats['2PT_MADE'] / twoPointAttempts) * 100 : 0
-        
-        const threePointAttempts = stats['3PT_MADE'] + stats['3PT_MISS']
-        const threePointPercentage = threePointAttempts > 0 ? (stats['3PT_MADE'] / threePointAttempts) * 100 : 0
-        
-        // Generate insights based on performance
-        if (twoPointAttempts >= 5 && twoPointPercentage < 30) {
-          newInsights.push(`${player.name} is struggling with 2PT shots (${twoPointPercentage.toFixed(1)}%). Consider running plays for better shot selection.`)
-        }
-        
-        if (threePointAttempts >= 3 && threePointPercentage > 50) {
-          newInsights.push(`${player.name} is hot from 3PT range (${threePointPercentage.toFixed(1)}%). Look for more opportunities beyond the arc.`)
-        }
-        
-        if (stats.TO >= 3) {
-          newInsights.push(`${player.name} has ${stats.TO} turnovers. Consider adjusting ball-handling responsibilities.`)
-        }
-        
-        if (stats.FOUL >= 4) {
-          newInsights.push(`\u26a0\ufe0f ${player.name} has ${stats.FOUL} fouls. Consider substitution to avoid fouling out.`)
-        }
-        
-        // Only add new unique insights
-        if (newInsights.length > 0) {
-          // Add only one insight at a time to avoid flooding
-          const randomInsight = newInsights[Math.floor(Math.random() * newInsights.length)]
-          get().addInsight(gameId, randomInsight)
-        }
-      }
     }),
     {
       name: 'basketball-data-storage',
     }
   )
-)
+);

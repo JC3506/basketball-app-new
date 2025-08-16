@@ -83,7 +83,7 @@ body {
   }
   
   .table-row {
-    @apply border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition duration-150 ease-in-out;
+    @apply border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition duration-150 ease-in-out;
   }
   
   .table-cell {
