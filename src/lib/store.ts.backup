@@ -11,23 +11,6 @@ export interface Player {
   isActive: boolean;
 }
 
-export interface Shot {
-  id: string;
-  x: number;
-  y: number;
-  made: boolean;
-  playerId: string;
-  defenderId?: string;
-  shotType: '2PT' | '3PT' | 'FT';
-  quarter: number;
-  timestamp: string;
-  gameId: string;
-  position?: {
-    zone: string;
-    distance: number;
-  };
-}
-
 export interface PlayerStats {
   PTS: number;
   '2PT_MADE': number;
@@ -61,7 +44,6 @@ export interface Game {
   timeRemaining: string;
   status: 'in-progress' | 'completed';
   insights: string[];
-  shots: Shot[]; // Add shots array to Game interface
 }
 
 interface BasketballStore {
@@ -91,21 +73,6 @@ interface BasketballStore {
   
   // Add the generateInsights function to the interface
   generateInsights: (gameId: string, playerId: string, stats: PlayerStats) => void;
-  
-  // Shot tracking
-  recordShot: (
-    gameId: string,
-    shot: Omit<Shot, 'id' | 'timestamp' | 'gameId' | 'position'>
-  ) => void;
-  
-  getShotsByGame: (gameId: string) => Shot[];
-  getShotsByPlayer: (gameId: string, playerId: string) => Shot[];
-  getShotEfficiency: (shots: Shot[]) => {
-    made: number;
-    missed: number;
-    total: number;
-    efficiency: number;
-  };
 }
 
 // Initialize empty player stats
@@ -154,8 +121,7 @@ export const useBasketballStore = create<BasketballStore>()(
           quarter: 1,
           timeRemaining: '12:00',
           status: 'in-progress',
-          insights: [],
-          shots: [] // Initialize empty shots array
+          insights: []
         }
         
         set(state => ({
@@ -386,119 +352,6 @@ export const useBasketballStore = create<BasketballStore>()(
           const randomInsight = newInsights[Math.floor(Math.random() * newInsights.length)]
           get().addInsight(gameId, randomInsight)
         }
-      },
-
-      recordShot: (
-        gameId: string,
-        shot: Omit<Shot, 'id' | 'timestamp' | 'gameId' | 'position'>
-      ) => {
-        const game = get().getGame(gameId);
-        if (!game) return;
-        
-        // Generate shot ID
-        const shotId = uuidv4();
-        
-        // Calculate shot position data
-        const courtWidth = 500;
-        const courtHeight = 470;
-        const basketY = 25;
-        
-        // Determine shot zone
-        let zone = '';
-        const distanceFromBasket = Math.sqrt(
-          Math.pow(shot.x - courtWidth/2, 2) + 
-          Math.pow(shot.y - basketY, 2)
-        );
-        
-        // Determine zone based on position
-        if (shot.y < 190 && Math.abs(shot.x - courtWidth/2) < 80) {
-          zone = 'Paint';
-        } else if (distanceFromBasket > 237.5) {
-          if (shot.y > courtHeight - 50) {
-            if (shot.x < courtWidth/2) {
-              zone = 'Left Corner 3';
-            } else {
-              zone = 'Right Corner 3';
-            }
-          } else {
-            zone = 'Above Break 3';
-          }
-        } else {
-          if (shot.x < courtWidth/2) {
-            zone = 'Mid-Range Left';
-          } else {
-            zone = 'Mid-Range Right';
-          }
-        }
-        
-        // Create complete shot object
-        const newShot: Shot = {
-          id: shotId,
-          gameId,
-          timestamp: new Date().toISOString(),
-          position: {
-            zone,
-            distance: distanceFromBasket
-          },
-          ...shot
-        };
-        
-        // Update player stats based on shot
-        if (shot.shotType === '2PT' && shot.made) {
-          get().recordStat(gameId, shot.playerId, '2PT_MADE');
-        } else if (shot.shotType === '2PT' && !shot.made) {
-          get().recordStat(gameId, shot.playerId, '2PT_MISS');
-        } else if (shot.shotType === '3PT' && shot.made) {
-          get().recordStat(gameId, shot.playerId, '3PT_MADE');
-        } else if (shot.shotType === '3PT' && !shot.made) {
-          get().recordStat(gameId, shot.playerId, '3PT_MISS');
-        } else if (shot.shotType === 'FT' && shot.made) {
-          get().recordStat(gameId, shot.playerId, 'FT_MADE');
-        } else if (shot.shotType === 'FT' && !shot.made) {
-          get().recordStat(gameId, shot.playerId, 'FT_MISS');
-        }
-        
-        // Update game state with new shot
-        set(state => ({
-          games: state.games.map(g => 
-            g.id === gameId 
-              ? { 
-                  ...g, 
-                  shots: [...(g.shots || []), newShot] 
-                }
-              : g
-          ),
-          currentGame: state.currentGame?.id === gameId 
-            ? { 
-                ...state.currentGame, 
-                shots: [...(state.currentGame.shots || []), newShot] 
-              }
-            : state.currentGame
-        }));
-      },
-
-      getShotsByGame: (gameId: string): Shot[] => {
-        const game = get().getGame(gameId);
-        return game?.shots || [];
-      },
-      
-      getShotsByPlayer: (gameId: string, playerId: string): Shot[] => {
-        const shots = get().getShotsByGame(gameId);
-        return shots.filter(shot => shot.playerId === playerId);
-      },
-      
-      getShotEfficiency: (shots: Shot[]) => {
-        const made = shots.filter(shot => shot.made).length;
-        const total = shots.length;
-        const missed = total - made;
-        const efficiency = total > 0 ? (made / total) * 100 : 0;
-        
-        return {
-          made,
-          missed,
-          total,
-          efficiency
-        };
       }
     }),
     {

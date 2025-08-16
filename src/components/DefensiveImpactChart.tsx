@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useBasketballStore } from '@/lib/store'
-import { Shot } from '@/lib/store' // Import the Shot interface
+import { ContestLevel, DefenderImpact } from './defensive-impact-types'
 
 // Court dimensions
 const courtWidth = 500
@@ -22,74 +22,60 @@ const shotZones = [
   { name: 'Mid-Range Right', color: '#a855f7' },
 ]
 
-interface EnhancedShotChartProps {
+interface DefensiveImpactChartProps {
   gameId: string
   showControls?: boolean
   height?: number
   width?: number
-  interactive?: boolean
-  onCourtClick?: (x: number, y: number) => void
 }
 
-export default function EnhancedShotChart({
+export default function DefensiveImpactChart({
   gameId,
   showControls = true,
   height = 470,
   width = 500,
-  interactive = false,
-  onCourtClick
-}: EnhancedShotChartProps) {
+}: DefensiveImpactChartProps) {
   // State
-  const [selectedPlayer, setSelectedPlayer] = useState<string | 'all'>('all')
+  const [selectedDefender, setSelectedDefender] = useState<string | 'all'>('all')
   const [selectedQuarter, setSelectedQuarter] = useState<number | 'all'>('all')
-  const [selectedShotType, setSelectedShotType] = useState<'all' | '2PT' | '3PT' | 'FT'>('all')
-  const [heatmapMode, setHeatmapMode] = useState(false)
+  const [visualizationMode, setVisualizationMode] = useState<'coverage' | 'efficiency' | 'contest-level'>('coverage')
   const [hoveredZone, setHoveredZone] = useState<string | null>(null)
   
   // Get game data from store
   const game = useBasketballStore(state => state.games.find(g => g.id === gameId))
-  const getShotsByGame = useBasketballStore(state => state.getShotsByGame)
-  const getShotEfficiency = useBasketballStore(state => state.getShotEfficiency)
+  const getTeamDefensiveImpact = useBasketballStore(state => 
+    (state as any).getTeamDefensiveImpact || (() => ({ totalContests: 0, successfulContests: 0, contestEfficiency: 0, contestsByLevel: {}, zoneDefenseEfficiency: {} })))
+  const getDefenderImpact = useBasketballStore(state => 
+    (state as any).getDefenderImpact || (() => ({ totalContests: 0, successfulContests: 0, contestEfficiency: 0, avgContestDistance: 0, contestsByLevel: {}, impactByZone: {} })))
   
-  // Get shots for this game
-  const shots = getShotsByGame(gameId) || []
+  // Get defensive impact data
+  const teamDefensiveImpact = getTeamDefensiveImpact(gameId)
+  const defenderImpact = selectedDefender !== 'all' ? getDefenderImpact(gameId, selectedDefender) : null
   
-  // Filter shots based on selections
-  const filteredShots = shots.filter(shot => {
-    const playerMatch = selectedPlayer === 'all' || shot.playerId === selectedPlayer
-    const quarterMatch = selectedQuarter === 'all' || shot.quarter === selectedQuarter
-    const shotTypeMatch = selectedShotType === 'all' || shot.shotType === selectedShotType
-    return playerMatch && quarterMatch && shotTypeMatch
-  })
+  // Get zone data based on selected defender
+  const zoneData = selectedDefender === 'all' 
+    ? teamDefensiveImpact.zoneDefenseEfficiency
+    : defenderImpact?.impactByZone || {}
   
-  // Calculate zone statistics
-  const zoneStats = shotZones.reduce((acc, zone) => {
-    const zoneShots = filteredShots.filter(shot => shot.position?.zone === zone.name)
-    const stats = getShotEfficiency(zoneShots)
+  // Render zone tooltip when hovering over a zone
+  const renderZoneTooltip = () => {
+    if (!hoveredZone) return null
     
-    acc[zone.name] = {
-      ...stats,
-      color: zone.color
-    }
+    const zoneInfo = zoneData[hoveredZone]
+    if (!zoneInfo) return null
     
-    return acc
-  }, {} as Record<string, { made: number; missed: number; total: number; efficiency: number; color: string }>)
-  
-  // Handle court click for interactive mode
-  const handleCourtClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!interactive || !onCourtClick) return
-    
-    // Get SVG coordinates
-    const svg = e.currentTarget
-    const rect = svg.getBoundingClientRect()
-    const x = (e.clientX - rect.left) * (courtWidth / rect.width)
-    const y = (e.clientY - rect.top) * (courtHeight / rect.height)
-    
-    onCourtClick(x, y)
+    return (
+      <div className="absolute top-2 left-2 bg-white/90 dark:bg-gray-800/90 p-2 rounded shadow-md text-sm z-10">
+        <div className="font-bold">{hoveredZone}</div>
+        <div>Contests: {zoneInfo.contests}</div>
+        <div>Successful Contests: {zoneInfo.successfulContests}</div>
+        <div>Defensive Efficiency: {zoneInfo.efficiency.toFixed(1)}%</div>
+      </div>
+    )
   }
   
-  // Render heatmap based on shooting efficiency
-  const renderHeatmap = () => {
+  // Render defensive coverage heatmap
+  const renderCoverageHeatmap = () => {
     // Define court zones
     const zones = [
       { name: 'Left Corner 3', path: `M0,${courtHeight - 50} L0,${courtHeight} L100,${courtHeight} L100,${courtHeight - 50} Z` },
@@ -100,23 +86,39 @@ export default function EnhancedShotChart({
       { name: 'Mid-Range Right', path: `M${courtWidth/2 + 80},0 L${courtWidth},0 L${courtWidth},${courtHeight - 50} L${courtWidth/2 + 80},${courtHeight - 50} A${freeThrowRadius},${freeThrowRadius} 0 0,1 ${courtWidth/2 + 80},190 Z` },
     ]
     
+    // Find max contests for normalization
+    const maxContests = Math.max(
+      ...Object.values(zoneData).map(zone => zone.contests || 0),
+      1 // Prevent division by zero
+    )
+    
     return (
       <g>
         {zones.map((zone, i) => {
-          const stats = zoneStats[zone.name] || { efficiency: 0, total: 0, color: '#888' }
-          const opacity = Math.min(0.8, 0.2 + (stats.total / 10) * 0.6)
+          const stats = zoneData[zone.name] || { contests: 0, successfulContests: 0, efficiency: 0 }
           
-          // Color based on efficiency: red (low) to green (high)
-          const efficiencyColor = stats.total > 0 
-            ? `hsl(${Math.min(stats.efficiency, 100) * 1.2}, 80%, 50%)`
-            : 'rgba(200, 200, 200, 0.3)'
+          // Coverage intensity based on number of contests
+          const coverageIntensity = Math.min(0.8, 0.2 + (stats.contests / maxContests) * 0.6)
+          
+          // Color based on visualization mode
+          let fillColor = '#3b82f6' // Default blue
+          
+          if (visualizationMode === 'efficiency') {
+            // Efficiency: red (low) to green (high)
+            fillColor = stats.contests > 0 
+              ? `hsl(${Math.min(stats.efficiency, 100) * 1.2}, 80%, 50%)`
+              : 'rgba(200, 200, 200, 0.3)'
+          } else if (visualizationMode === 'contest-level') {
+            // Contest level: yellow (light) to red (heavy)
+            fillColor = '#f59e0b' // Default amber
+          }
           
           return (
             <path
               key={i}
               d={zone.path}
-              fill={efficiencyColor}
-              opacity={opacity}
+              fill={fillColor}
+              opacity={coverageIntensity}
               stroke="white"
               strokeWidth="1"
               onMouseEnter={() => setHoveredZone(zone.name)}
@@ -126,8 +128,8 @@ export default function EnhancedShotChart({
         })}
         
         {zones.map((zone, i) => {
-          const stats = zoneStats[zone.name]
-          if (!stats || stats.total === 0) return null
+          const stats = zoneData[zone.name]
+          if (!stats || stats.contests === 0) return null
           
           // Calculate zone center for text placement
           let cx = 0, cy = 0
@@ -152,6 +154,21 @@ export default function EnhancedShotChart({
             cy = courtHeight / 2
           }
           
+          // Text content based on visualization mode
+          let primaryText = ''
+          let secondaryText = ''
+          
+          if (visualizationMode === 'coverage') {
+            primaryText = `${stats.contests}`
+            secondaryText = 'contests'
+          } else if (visualizationMode === 'efficiency') {
+            primaryText = `${stats.efficiency.toFixed(1)}%`
+            secondaryText = `(${stats.successfulContests}/${stats.contests})`
+          } else if (visualizationMode === 'contest-level') {
+            primaryText = `${stats.contests}`
+            secondaryText = 'contests'
+          }
+          
           return (
             <g key={`text-${i}`}>
               <text
@@ -165,7 +182,7 @@ export default function EnhancedShotChart({
                 strokeWidth="0.5"
                 paintOrder="stroke"
               >
-                {stats.efficiency.toFixed(1)}%
+                {primaryText}
               </text>
               <text
                 x={cx}
@@ -177,7 +194,7 @@ export default function EnhancedShotChart({
                 strokeWidth="0.5"
                 paintOrder="stroke"
               >
-                ({stats.made}/{stats.total})
+                {secondaryText}
               </text>
             </g>
           )
@@ -186,37 +203,31 @@ export default function EnhancedShotChart({
     )
   }
   
-  // Render zone tooltip when hovering over a zone in heatmap mode
-  const renderZoneTooltip = () => {
-    if (!hoveredZone || !heatmapMode) return null
-    
-    const stats = zoneStats[hoveredZone]
-    if (!stats) return null
-    
-    return (
-      <div className="absolute top-2 left-2 bg-white/90 dark:bg-gray-800/90 p-2 rounded shadow-md text-sm z-10">
-        <div className="font-bold">{hoveredZone}</div>
-        <div>Made: {stats.made} | Missed: {stats.missed}</div>
-        <div>Efficiency: {stats.efficiency.toFixed(1)}%</div>
-      </div>
-    )
-  }
-  
-  // Calculate overall shooting efficiency
-  const overallStats = getShotEfficiency(filteredShots)
+  // Calculate overall defensive metrics
+  const overallDefensiveStats = selectedDefender === 'all'
+    ? {
+        totalContests: teamDefensiveImpact.totalContests,
+        successfulContests: teamDefensiveImpact.successfulContests,
+        efficiency: teamDefensiveImpact.contestEfficiency
+      }
+    : {
+        totalContests: defenderImpact?.totalContests || 0,
+        successfulContests: defenderImpact?.successfulContests || 0,
+        efficiency: defenderImpact?.contestEfficiency || 0
+      }
   
   return (
     <div className="card">
       {showControls && (
         <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-          <h2 className="text-xl font-bold">Shot Chart</h2>
+          <h2 className="text-xl font-bold">Defensive Impact</h2>
           <div className="flex flex-wrap gap-2">
             <select 
               className="input-field py-1 px-2 text-sm"
-              value={selectedPlayer}
-              onChange={(e) => setSelectedPlayer(e.target.value)}
+              value={selectedDefender}
+              onChange={(e) => setSelectedDefender(e.target.value)}
             >
-              <option value="all">All Players</option>
+              <option value="all">All Defenders</option>
               {game?.players.map(player => (
                 <option key={player.id} value={player.id}>
                   {player.name} (#{player.number})
@@ -238,21 +249,13 @@ export default function EnhancedShotChart({
             
             <select 
               className="input-field py-1 px-2 text-sm"
-              value={selectedShotType}
-              onChange={(e) => setSelectedShotType(e.target.value as any)}
+              value={visualizationMode}
+              onChange={(e) => setVisualizationMode(e.target.value as any)}
             >
-              <option value="all">All Shots</option>
-              <option value="2PT">2PT</option>
-              <option value="3PT">3PT</option>
-              <option value="FT">FT</option>
+              <option value="coverage">Coverage</option>
+              <option value="efficiency">Defensive Efficiency</option>
+              <option value="contest-level">Contest Level</option>
             </select>
-            
-            <button 
-              className={`py-1 px-3 rounded text-sm ${heatmapMode ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-800'}`}
-              onClick={() => setHeatmapMode(!heatmapMode)}
-            >
-              {heatmapMode ? 'Show Shots' : 'Show Heatmap'}
-            </button>
           </div>
         </div>
       )}
@@ -262,8 +265,7 @@ export default function EnhancedShotChart({
         
         <svg 
           viewBox={`0 0 ${courtWidth} ${courtHeight}`} 
-          className={`w-full h-auto border border-gray-300 bg-blue-50 ${interactive ? 'cursor-crosshair' : ''}`}
-          onClick={handleCourtClick}
+          className="w-full h-auto border border-gray-300 bg-blue-50"
         >
           {/* Court markings */}
           <rect x="0" y="0" width={courtWidth} height={courtHeight} fill="#f8fafc" stroke="#334155" strokeWidth="2" />
@@ -298,38 +300,45 @@ export default function EnhancedShotChart({
           {/* Backboard */}
           <line x1={courtWidth/2 - 30} y1="0" x2={courtWidth/2 + 30} y2="0" stroke="#334155" strokeWidth="4" />
           
-          {/* Shots or heatmap */}
-          {heatmapMode ? (
-            renderHeatmap()
-          ) : (
-            filteredShots.map((shot) => (
-              <circle 
-                key={shot.id}
-                cx={shot.x}
-                cy={shot.y}
-                r="5"
-                fill={shot.made ? "#22c55e" : "#ef4444"}
-                stroke="white"
-                strokeWidth="1"
-              />
-            ))
-          )}
+          {/* Defensive coverage visualization */}
+          {renderCoverageHeatmap()}
         </svg>
         
         <div className="mt-4 flex justify-between text-sm">
           <div>
-            <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
-            Made: {overallStats.made}
+            <span className="font-bold">Total Contests: </span>
+            {overallDefensiveStats.totalContests}
           </div>
           <div>
-            <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
-            Missed: {overallStats.missed}
+            <span className="font-bold">Successful Contests: </span>
+            {overallDefensiveStats.successfulContests}
           </div>
           <div>
-            <span className="font-bold">Efficiency: </span>
-            {overallStats.efficiency.toFixed(1)}%
+            <span className="font-bold">Defensive Efficiency: </span>
+            {overallDefensiveStats.efficiency.toFixed(1)}%
           </div>
         </div>
+        
+        {/* Contest level breakdown */}
+        {visualizationMode === 'contest-level' && (
+          <div className="mt-4 grid grid-cols-5 gap-2 text-xs">
+            {Object.values(ContestLevel).map((level) => {
+              const contestCount = selectedDefender === 'all'
+                ? teamDefensiveImpact.contestsByLevel?.[level] || 0
+                : defenderImpact?.contestsByLevel?.[level] || 0
+              
+              const totalContests = overallDefensiveStats.totalContests || 1 // Prevent division by zero
+              const percentage = (contestCount / totalContests) * 100
+              
+              return (
+                <div key={level} className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-center">
+                  <div className="font-medium">{level.replace('_', ' ')}</div>
+                  <div className="mt-1">{contestCount} ({percentage.toFixed(1)}%)</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

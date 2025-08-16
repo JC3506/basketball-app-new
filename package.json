@@ -12,12 +12,9 @@
     "@types/node": "20.5.7",
     "@types/react": "18.2.21",
     "@types/react-dom": "18.2.7",
+    "@types/uuid": "^9.0.4",
     "chart.js": "^4.4.0",
     "date-fns": "^2.30.0",
-    "file-saver": "^2.0.5",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^3.0.1",
-    "jspdf-autotable": "^5.0.2",
     "next": "13.4.19",
     "react": "18.2.0",
     "react-chartjs-2": "^5.2.0",
@@ -27,7 +24,6 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@types/uuid": "^10.0.0",
     "autoprefixer": "10.4.15",
     "eslint": "8.48.0",
     "eslint-config-next": "13.4.19",

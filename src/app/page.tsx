@@ -1,4 +1,3 @@
-
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 
@@ -88,7 +87,7 @@ export default function Home() {
                   Track shot locations and visualize shooting patterns with interactive heat maps. Identify hot zones and areas for improvement.
                 </p>
                 <Link href="/dashboard" className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                  Try it out \u2192
+                  Try it out →
                 </Link>
               </div>
             </div>
@@ -105,7 +104,7 @@ export default function Home() {
                   Get specialized insights on shooting efficiency, player chemistry, and defensive adjustments to optimize your team's performance.
                 </p>
                 <Link href="/dashboard" className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                  Explore insights \u2192
+                  Explore insights →
                 </Link>
               </div>
             </div>
@@ -122,7 +121,7 @@ export default function Home() {
                   Access detailed player and team statistics with sortable tables and filters. Compare performance across different games and time periods.
                 </p>
                 <Link href="/statistics" className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                  View statistics \u2192
+                  View statistics →
                 </Link>
               </div>
             </div>
@@ -139,7 +138,7 @@ export default function Home() {
                   Generate detailed player and team reports with performance insights, trends, and recommendations. Export reports for sharing.
                 </p>
                 <Link href="/reports" className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                  Generate reports \u2192
+                  Generate reports →
                 </Link>
               </div>
             </div>
@@ -211,7 +210,7 @@ export default function Home() {
 
       <footer className="bg-gray-100 dark:bg-gray-800 p-6 border-t">
         <div className="container mx-auto text-center">
-          <p className="text-gray-600 dark:text-gray-300">\u00a9 2025 Basketball Data App. All rights reserved.</p>
+          <p className="text-gray-600 dark:text-gray-300">© 2025 Basketball Data App. All rights reserved.</p>
         </div>
       </footer>
     </div>
